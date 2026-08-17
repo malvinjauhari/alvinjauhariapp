@@ -7,6 +7,7 @@ import { useUserCollection } from '../../hooks/useUserCollection';
 import { useNavigate } from 'react-router-dom';
 import { Modal } from '../../components/ui/Modal';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { classifyInput } from '../../lib/classify';
 
 type ChatbotMode = 'default' | 'creating_category_select_type' | 'creating_category_enter_name';
 
@@ -67,21 +68,15 @@ export const DashboardHome = () => {
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch('/api/capture/classify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: user.uid, input: input.trim(), source: 'chatbot' })
-      });
-      
-      const data = await res.json();
+      const data = await classifyInput(user.uid, input.trim(), 'chatbot');
       setResult(data);
-      if (data.status === 'success' || data.status === 'fallback') {
+      if (data.status === 'success') {
         setInput('');
         setTimeout(() => inputRef.current?.focus(), 100);
       }
     } catch (err) {
       console.error('Failed to capture:', err);
-      setResult({ status: 'error', message: 'Failed to connect to capture service.' });
+      setResult({ status: 'error', message: 'Failed to classify input.' });
     } finally {
       setLoading(false);
     }
