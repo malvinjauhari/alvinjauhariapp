@@ -1,0 +1,82 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    // Preserve the original root collection rules just in case they are used by another undocumented module
+    function isCreatingOwnDoc() {
+      return signedIn() && request.resource.data.userId == request.auth.uid;
+    }
+    function isReadingOwnDoc() {
+      return signedIn() && resource.data.userId == request.auth.uid;
+    }
+    function isUpdatingOwnDoc() {
+      return signedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+    }
+
+    // MAIN FIX: Properly match the subcollection architecture: users/{userId}/{collectionName}
+    match /users/{userId} {
+      allow read, create, update: if isOwner(userId);
+      allow delete: if false;
+
+      // Allow access to all valid subcollections under the user's document
+      match /{collectionName}/{docId} {
+        allow read, write: if isOwner(userId) && (
+          collectionName == 'links' ||
+          collectionName == 'notes' ||
+          collectionName == 'temporaryNotes' ||
+          collectionName == 'tasks' ||
+          collectionName == 'captureHistory' ||
+          collectionName == 'categories' ||
+          collectionName == 'wallets' ||
+          collectionName == 'transactions'
+        );
+      }
+    }
+
+    // Legacy / Generic Root Collections Rules (from before the nested architecture fix)
+    match /links/{docId} {
+      allow create: if isCreatingOwnDoc();
+      allow update: if isUpdatingOwnDoc();
+      allow read, delete: if isReadingOwnDoc();
+    }
+    match /categories/{docId} {
+      allow create: if isCreatingOwnDoc();
+      allow update: if isUpdatingOwnDoc();
+      allow read, delete: if isReadingOwnDoc();
+    }
+    match /notes/{docId} {
+      allow create: if isCreatingOwnDoc();
+      allow update: if isUpdatingOwnDoc();
+      allow read, delete: if isReadingOwnDoc();
+    }
+    match /tasks/{docId} {
+      allow create: if isCreatingOwnDoc();
+      allow update: if isUpdatingOwnDoc();
+      allow read, delete: if isReadingOwnDoc();
+    }
+    match /checklistItems/{docId} {
+      allow create: if isCreatingOwnDoc();
+      allow update: if isUpdatingOwnDoc();
+      allow read, delete: if isReadingOwnDoc();
+    }
+    match /aiRequests/{docId} {
+      allow create: if isCreatingOwnDoc();
+      allow read: if isReadingOwnDoc();
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
